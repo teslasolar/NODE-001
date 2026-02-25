@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@core/*": ["src/core/*"],
+      "@rings/*": ["src/rings/*"],
+      "@sensors/*": ["src/sensors/*"],
+      "@pipeline/*": ["src/pipeline/*"],
+      "@privacy/*": ["src/privacy/*"],
+      "@p2p/*": ["src/p2p/*"],
+      "@standards/*": ["src/standards/*"],
+      "@config/*": ["src/config/*"],
+      "@device/*": ["src/device/*"],
+      "@types/*": ["src/types/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "tests"]
+}
