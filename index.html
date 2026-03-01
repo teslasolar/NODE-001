@@ -15,15 +15,16 @@ body::before{content:'';position:fixed;inset:0;z-index:0;
              radial-gradient(ellipse at 70% 80%,rgba(60,0,80,0.1),transparent 50%),
              #050308}
 
-.wrap{position:relative;z-index:1;text-align:center;padding:40px 20px;max-width:680px;width:100%}
+.wrap{position:relative;z-index:1;text-align:center;padding:40px 20px;max-width:820px;width:100%}
 
 h1{font-family:Georgia,serif;font-size:2.8rem;letter-spacing:0.35em;color:#ffd700;margin-bottom:4px;
   text-shadow:0 0 30px rgba(255,215,0,0.15)}
 .tagline{color:#445;font-size:0.7rem;letter-spacing:3px;margin-bottom:40px}
 
 /* Navigation cards */
-.cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:40px}
-@media(max-width:520px){.cards{grid-template-columns:1fr}}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:40px}
+@media(max-width:720px){.cards{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.cards{grid-template-columns:1fr}}
 
 .card{background:rgba(10,8,20,0.85);border:1px solid rgba(255,255,255,0.06);
   border-radius:8px;padding:24px 20px;text-align:left;text-decoration:none;
@@ -72,6 +73,16 @@ h1{font-family:Georgia,serif;font-size:2.8rem;letter-spacing:0.35em;color:#ffd70
         phoneme classification, vagal zone mapping, resonance tracking.
       </div>
       <span class="card-tag">AUDIO &middot; WAVEFORM &middot; VAGAL &middot; MIC</span>
+    </a>
+
+    <a class="card" href="viz/webllm-sandbox/index.html" style="--accent:#a8f">
+      <span class="card-icon">&#9000;</span>
+      <div class="card-title">WEBLLM SANDBOX</div>
+      <div class="card-desc">
+        Voice-powered code builder. In-browser LLM via WebGPU,
+        virtual filesystem, live preview, emotion-aware chat.
+      </div>
+      <span class="card-tag">LLM &middot; VOICE &middot; WEBGPU &middot; CODE</span>
     </a>
   </div>
 
