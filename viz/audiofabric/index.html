@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AudioFabric — 3D Vagal Waveform</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a14;color:#fff;font-family:'Courier New',monospace;overflow:hidden}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+/* Top bar */
+#topBar{position:fixed;top:0;left:0;right:0;z-index:60;display:flex;align-items:center;
+  justify-content:space-between;padding:8px 16px;background:rgba(0,0,0,0.7);
+  border-bottom:1px solid #0ff2}
+#title{font-size:14px;color:#0ff;letter-spacing:2px}
+#subtitle{font-size:10px;color:#088;margin-left:12px}
+#navBack{color:#0ff8;text-decoration:none;font-size:10px;letter-spacing:1px;
+  padding:4px 10px;border:1px solid #0ff2;border-radius:3px;transition:all 0.2s}
+#navBack:hover{background:#0ff1;border-color:#0ff4}
+/* Vagal Zone HUD — left side */
+#vagalHUD{position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:55;
+  pointer-events:none;opacity:0;transition:opacity 0.4s}
+#vagalHUD.on{opacity:1}
+#vagalTitle{font-size:11px;color:#0ff8;letter-spacing:2px;margin-bottom:8px;text-align:center}
+.vagal-zone{display:flex;align-items:center;gap:8px;margin:4px 0;opacity:0.15;
+  transition:opacity 0.3s,transform 0.3s}
+.vagal-zone.active{opacity:1;transform:translateX(4px)}
+.vagal-zone.peak{opacity:1;transform:translateX(8px)}
+.vagal-dot{width:12px;height:12px;border-radius:50%;border:1px solid;transition:background 0.3s,box-shadow 0.3s}
+.vagal-zone.active .vagal-dot{box-shadow:0 0 8px currentColor}
+.vagal-zone.peak .vagal-dot{background:currentColor;box-shadow:0 0 12px currentColor,0 0 24px currentColor}
+.vagal-name{font-size:9px;letter-spacing:1px}
+.vagal-prime{font-size:8px;color:#fff3;margin-left:auto}
+/* Phoneme HUD — right side */
+#phonemeHUD{position:fixed;right:16px;top:50%;transform:translateY(-50%);z-index:55;
+  text-align:center;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#phonemeHUD.on{opacity:1}
+#phonemeChar{font-size:64px;line-height:1;text-shadow:0 0 30px currentColor,0 0 60px currentColor;
+  transition:color 0.3s}
+#phonemeIPA{font-size:14px;color:#fff8;margin-top:4px}
+#phonemeType{font-size:9px;color:#fff4;margin-top:2px;letter-spacing:1px}
+#phonemeMode{font-size:10px;color:#0ff;margin-top:6px;letter-spacing:1px}
+#phonemeRings{font-size:9px;color:#ff08;margin-top:2px}
+/* Resonance depth HUD */
+#resHUD{position:fixed;left:16px;bottom:80px;z-index:55;pointer-events:none;
+  opacity:0;transition:opacity 0.4s}
+#resHUD.on{opacity:1}
+#resKanji{font-size:48px;line-height:1;text-shadow:0 0 25px currentColor;text-align:center;transition:color 0.3s}
+#resLabel{font-size:8px;color:#fff4;text-align:center;margin-top:2px;letter-spacing:2px}
+#resProgress{width:100%;height:2px;background:#111;border-radius:1px;margin-top:4px;overflow:hidden}
+#resProgressFill{height:100%;width:0%;background:#fff;transition:width 0.08s,background 0.3s;border-radius:1px}
+#resSustain{font-size:9px;color:#fff3;text-align:center;margin-top:2px;font-variant-numeric:tabular-nums}
+#resMultiplier{font-size:20px;color:#ff0;text-align:center;margin-top:4px;text-shadow:0 0 10px #f80;
+  opacity:0;transition:opacity 0.3s}
+#resMultiplier.on{opacity:1}
+/* Bottom bar */
+#bottomBar{position:fixed;bottom:0;left:0;right:0;z-index:60;display:flex;align-items:center;
+  justify-content:center;gap:12px;padding:10px;background:rgba(0,0,0,0.8);border-top:1px solid #0ff1}
+.bottom-btn{background:#111;border:1px solid #fff2;color:#fff;padding:8px 18px;
+  cursor:pointer;font-size:11px;font-family:monospace;border-radius:20px;
+  display:flex;align-items:center;gap:6px;transition:all 0.2s}
+.bottom-btn:hover{background:#222}
+.bottom-btn.active{background:#0f02;border-color:#0f04;color:#0f0}
+.bottom-btn.muted{background:#f002;border-color:#f004;color:#f44}
+.bottom-btn .icon{font-size:16px}
+/* Waveform info overlay */
+#waveInfo{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:50;
+  text-align:center;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#waveInfo.on{opacity:1}
+#waveF0{font-size:11px;color:#0ff8}
+#waveEnergy{font-size:10px;color:#ff08;margin-top:2px}
+/* Depth layer indicators */
+#depthLayers{position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:55;
+  pointer-events:none}
+#version{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);z-index:45;
+  font-size:8px;color:#222;letter-spacing:3px;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="topBar">
+  <div>
+    <span id="title">3D VAGAL WAVEFORM</span>
+    <span id="subtitle">ASS-OS Phoneme Visualization</span>
+  </div>
+  <a id="navBack" href="../../index.html">&larr; NODE</a>
+</div>
+<div id="vagalHUD">
+  <div id="vagalTitle">VAGAL ZONES</div>
+  <div id="vagalZones"></div>
+</div>
+<div id="phonemeHUD">
+  <div id="phonemeChar" style="color:#4488ff">&#9702;</div>
+  <div id="phonemeIPA"></div>
+  <div id="phonemeType"></div>
+  <div id="phonemeMode"></div>
+  <div id="phonemeRings"></div>
+</div>
+<div id="resHUD">
+  <div id="resKanji" style="color:#4488ff">気</div>
+  <div id="resLabel">RESONANCE</div>
+  <div id="resProgress"><div id="resProgressFill"></div></div>
+  <div id="resSustain">0.0s</div>
+  <div id="resMultiplier">1x</div>
+</div>
+<div id="waveInfo">
+  <div id="waveF0">F0: ---</div>
+  <div id="waveEnergy">ENERGY: 0%</div>
+</div>
+<div id="bottomBar">
+  <button class="bottom-btn active" id="micBtn" onclick="toggleMic()">
+    <span class="icon">&#9899;</span> MIC ON
+  </button>
+  <button class="bottom-btn" id="orbitBtn" onclick="toggleOrbit()">
+    <span class="icon">&#8634;</span> ORBIT
+  </button>
+</div>
+<div id="version">AUDIOFABRIC 3D VAGAL WAVEFORM — ASS-OS-PHONEME-001</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+// ============================================================
+// AUDIOFABRIC — 3D VAGAL WAVEFORM VISUALIZATION
+// Waveforms shoot from speaker positions toward a central
+// vagal sphere, pass through it, and emerge on the opposite
+// side preserving harmonic structure.
+// Based on ASS-OS Vagal Phoneme Reference v1.0
+// ============================================================
+import { KI } from './modules/core.js';
+import * as VoiceEngine from './modules/voice-engine.js';
+// ============================================================
+// ASS-OS VAGAL PHONEME MAP
+// From the Vagal Phoneme Reference Document
+// ============================================================
+const VAGAL_ZONES = [
+  { ring: 'R0', prime: 2,  name: 'Diaphragm',      branch: 'Vagal trunk (abdominal)',
+    sounds: ['haha','sigh'], color: 0xff3322, colorStr: '#ff3322',
+    isa: 'L0: Physical process', func: 'Plant floor. Ground. The pump.' },
+  { ring: 'R1', prime: 3,  name: 'Larynx',          branch: 'Recurrent laryngeal nerve',
+    sounds: ['mm','h'], color: 0x44ffaa, colorStr: '#44ffaa',
+    isa: 'L1: Sensors/actuators', func: 'Sensors. Detection. Vibration OR turbulence.' },
+  { ring: 'R2', prime: 5,  name: 'Breath/Exhale',   branch: 'Vagal brake',
+    sounds: ['sh','ss','wh'], color: 0x00ccff, colorStr: '#00ccff',
+    isa: 'L2: Control systems', func: 'SCADA gate. Exhale > inhale = parasympathetic.' },
+  { ring: 'R3', prime: 7,  name: 'Thoracic',        branch: 'Vagal trunk (thoracic)',
+    sounds: ['oh','chest'], color: 0xffffff, colorStr: '#ffffff',
+    isa: 'L3: Manufacturing execution', func: 'MES. Production. Resonance propagation.' },
+  { ring: 'R4', prime: 11, name: 'Nasopharynx',     branch: 'Pharyngeal branch',
+    sounds: ['ee'], color: 0xffdd00, colorStr: '#ffdd00',
+    isa: 'L4: Business planning', func: 'ERP. Processing. Verification.' },
+  { ring: 'R5', prime: 13, name: 'Oral Shaping',    branch: 'Oral cavity',
+    sounds: ['vowel'], color: 0xff8844, colorStr: '#ff8844',
+    isa: 'L5: Enterprise', func: 'Enterprise. Identity. Choosing the sound.' },
+  { ring: 'R6', prime: 17, name: 'Intent/Silence',  branch: 'Observer',
+    sounds: ['silence'], color: 0xaa44ff, colorStr: '#aa44ff',
+    isa: 'Above L5: The why', func: 'Observer. The Dao. What the sieve operates IN.' }
+];
+// Phoneme → vagal zone activation mapping (from the document)
+const PHONEME_MAP = {
+  mm: { ipa: '/m/', type: 'Sustained bilabial nasal', mode: 'SUSTAINED',
+    mechanism: 'Lips closed, vocal cords vibrating. Vibration transmits through laryngeal branch.',
+    rings: [0,1], intensity: 0.4, vagalEffect: 'Continuous laryngeal vagal activation',
+    kanji: '土', name: 'Earth', color: '#44ffaa', hex: 0x44ffaa },
+  ah: { ipa: '/ɑː/', type: 'Sustained open vowel', mode: 'SUSTAINED',
+    mechanism: 'Maximum mouth opening, tongue flat. Full abdominal vibration propagation.',
+    rings: [3,4], intensity: 0.7, vagalEffect: 'Full abdominal vibration propagation',
+    kanji: '火', name: 'Fire', color: '#ff4444', hex: 0xff4444 },
+  oh: { ipa: '/oʊ/', type: 'Sustained open-mid back vowel', mode: 'SUSTAINED',
+    mechanism: 'Mouth rounds, chest resonance maximized. Vibration propagates to stomach.',
+    rings: [2,3], intensity: 0.6, vagalEffect: 'Maximum thoracic cavity resonance',
+    kanji: '気', name: 'Spirit', color: '#ffffff', hex: 0xffffff },
+  ee: { ipa: '/iː/', type: 'Sustained high front vowel', mode: 'SUSTAINED',
+    mechanism: 'Tongue forward, oral cavity smallest. Back-pressure through nasal cavity.',
+    rings: [4], intensity: 0.5, vagalEffect: 'Nasopharyngeal back-pressure',
+    kanji: '雷', name: 'Lightning', color: '#ffdd00', hex: 0xffdd00 },
+  eh: { ipa: '/ɛ/', type: 'Sustained mid front vowel', mode: 'SUSTAINED',
+    mechanism: 'Mid tongue position. Moderate back-pressure, mixed resonance.',
+    rings: [2,5], intensity: 0.5, vagalEffect: 'Mixed oral-exhale activation',
+    kanji: '風', name: 'Wind', color: '#ff8844', hex: 0xff8844 },
+  oo: { ipa: '/uː/', type: 'Sustained close back vowel', mode: 'SUSTAINED',
+    mechanism: 'Lips pursed, oral cavity elongated. Deep chest resonance.',
+    rings: [2,3], intensity: 0.55, vagalEffect: 'Deep chest + breath resonance',
+    kanji: '水', name: 'Water', color: '#aa44ff', hex: 0xaa44ff }
+};
+// ============================================================
+// SCENE SETUP
+// ============================================================
+const W = window.innerWidth, H = window.innerHeight;
+KI.W = W; KI.H = H;
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x000008, 0.006);
+const camera = new THREE.PerspectiveCamera(55, W / H, 0.1, 800);
+camera.position.set(0, 3, 14);
+camera.lookAt(0, 1.5, 0);
+const renderer = new THREE.WebGLRenderer({
+  canvas: document.getElementById('c'), antialias: true, alpha: true,
+  powerPreference: 'high-performance'
+});
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.4;
+renderer.outputEncoding = THREE.sRGBEncoding;
+const clock = new THREE.Clock();
+KI.scene = scene; KI.camera = camera; KI.renderer = renderer; KI.clock = clock;
+window.onresize = () => {
+  KI.W = window.innerWidth; KI.H = window.innerHeight;
+  camera.aspect = KI.W / KI.H;
+  camera.updateProjectionMatrix();
+  renderer.setSize(KI.W, KI.H);
+};
+// ============================================================
+// STARFIELD
+// ============================================================
+const starCount = 4000;
+const sg = new THREE.BufferGeometry();
+const sp = new Float32Array(starCount * 3);
+const ss = new Float32Array(starCount);
+for (let i = 0; i < starCount; i++) {
+  sp[i*3] = (Math.random()-0.5)*400;
+  sp[i*3+1] = (Math.random()-0.5)*400;
+  sp[i*3+2] = (Math.random()-0.5)*400;
+  ss[i] = 0.2 + Math.random() * 0.6;
+}
+sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+sg.setAttribute('size', new THREE.BufferAttribute(ss, 1));
+const starMat = new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(0xccddff) } },
+  vertexShader: `
+    attribute float size;
+    uniform float uTime;
+    varying float vBright;
+    void main() {
+      vBright = 0.5 + 0.5 * sin(uTime * 0.5 + position.x * 0.1 + position.y * 0.15);
+      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+      gl_PointSize = size * (200.0 / -mvPosition.z) * vBright;
+      gl_Position = projectionMatrix * mvPosition;
+    }
+  `,
+  fragmentShader: `
+    uniform vec3 uColor;
+    varying float vBright;
+    void main() {
+      float d = length(gl_PointCoord - 0.5) * 2.0;
+      if (d > 1.0) discard;
+      float alpha = (1.0 - d * d) * vBright;
+      gl_FragColor = vec4(uColor, alpha);
+    }
+  `,
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+});
+scene.add(new THREE.Points(sg, starMat));
+// ============================================================
+// ARENA FLOOR
+// ============================================================
+const floorCanvas = document.createElement('canvas');
+floorCanvas.width = 1024; floorCanvas.height = 1024;
+const fctx = floorCanvas.getContext('2d');
+fctx.fillStyle = '#050520';
+fctx.fillRect(0, 0, 1024, 1024);
+// concentric vagal rings on floor
+VAGAL_ZONES.forEach((vz, i) => {
+  const r = 80 + i * 55;
+  fctx.beginPath();
+  fctx.arc(512, 512, r, 0, Math.PI * 2);
+  fctx.strokeStyle = vz.colorStr + '30';
+  fctx.lineWidth = 2;
+  fctx.stroke();
+  // ring label
+  fctx.font = '14px monospace';
+  fctx.fillStyle = vz.colorStr + '40';
+  fctx.fillText(vz.ring, 512 + r - 16, 508);
+});
+// radial lines
+for (let a = 0; a < Math.PI * 2; a += Math.PI / 12) {
+  fctx.beginPath();
+  fctx.moveTo(512, 512);
+  fctx.lineTo(512 + Math.cos(a)*480, 512 + Math.sin(a)*480);
+  fctx.strokeStyle = 'rgba(0, 60, 150, 0.06)';
+  fctx.lineWidth = 1;
+  fctx.stroke();
+}
+const floorTex = new THREE.CanvasTexture(floorCanvas);
+const floorGeo = new THREE.CircleGeometry(20, 96);
+const floorMat = new THREE.MeshBasicMaterial({ map: floorTex, transparent: true, opacity: 0.5 });
+const floor = new THREE.Mesh(floorGeo, floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -0.01;
+scene.add(floor);
+const grid = new THREE.GridHelper(40, 40, 0x003366, 0x000d22);
+grid.material.transparent = true; grid.material.opacity = 0.2;
+scene.add(grid);
+// ============================================================
+// CENTRAL VAGAL SPHERE — the ball that waveforms hit
+// ============================================================
+const centralGroup = new THREE.Group();
+centralGroup.position.set(0, 2.0, 0);
+scene.add(centralGroup);
+// Core sphere
+const coreGeo = new THREE.IcosahedronGeometry(1.0, 4);
+const coreMat = new THREE.MeshBasicMaterial({
+  color: 0x224488, transparent: true, opacity: 0.15,
+  blending: THREE.AdditiveBlending, depthWrite: false, wireframe: true
+});
+const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+centralGroup.add(coreMesh);
+// Inner glow
+const innerGlowGeo = new THREE.SphereGeometry(0.8, 32, 32);
+const innerGlowMat = new THREE.MeshBasicMaterial({
+  color: 0x2244aa, transparent: true, opacity: 0.08,
+  blending: THREE.AdditiveBlending, depthWrite: false
+});
+const innerGlow = new THREE.Mesh(innerGlowGeo, innerGlowMat);
+centralGroup.add(innerGlow);
+// Outer glow shell
+const outerGlowGeo = new THREE.SphereGeometry(1.4, 24, 24);
+const outerGlowMat = new THREE.MeshBasicMaterial({
+  color: 0x112244, transparent: true, opacity: 0,
+  blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+});
+const outerGlow = new THREE.Mesh(outerGlowGeo, outerGlowMat);
+centralGroup.add(outerGlow);
+// Vagal zone rings (R0-R6) — concentric torus rings around the central sphere
+const vagalRings = [];
+VAGAL_ZONES.forEach((vz, i) => {
+  const radius = 1.2 + i * 0.35;
+  const tubeRadius = 0.015 + (i === 0 ? 0.01 : 0);
+  const geo = new THREE.TorusGeometry(radius, tubeRadius, 8, 64);
+  const mat = new THREE.MeshBasicMaterial({
+    color: vz.color, transparent: true, opacity: 0.05,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  const ring = new THREE.Mesh(geo, mat);
+  // Alternate ring orientations for visual depth
+  ring.rotation.x = Math.PI / 2 + (i % 2 === 0 ? 0 : Math.PI / 6);
+  ring.rotation.y = (i * Math.PI) / 7;
+  centralGroup.add(ring);
+  vagalRings.push({ mesh: ring, zone: vz, baseOpacity: 0.05, active: false });
+});
+// ============================================================
+// SPEAKER POSITIONS — arranged around the central ball
+// ============================================================
+const SPEAKER_POSITIONS = [
+  { pos: new THREE.Vector3(0, 2.0, 8),  label: 'YOU', isLocal: true },
+  { pos: new THREE.Vector3(-5, 2.5, 5), label: 'PEER-L1', isLocal: false },
+  { pos: new THREE.Vector3(5, 2.5, 5),  label: 'PEER-R1', isLocal: false },
+  { pos: new THREE.Vector3(-7, 3, 0),   label: 'PEER-L2', isLocal: false },
+  { pos: new THREE.Vector3(7, 3, 0),    label: 'PEER-R2', isLocal: false },
+  { pos: new THREE.Vector3(-4, 2.5, -5),label: 'PEER-L3', isLocal: false },
+  { pos: new THREE.Vector3(4, 2.5, -5), label: 'PEER-R3', isLocal: false },
+];
+// Speaker node visuals
+const speakerNodes = [];
+SPEAKER_POSITIONS.forEach((sp, idx) => {
+  const group = new THREE.Group();
+  group.position.copy(sp.pos);
+  // Speaker sphere
+  const sGeo = new THREE.IcosahedronGeometry(0.3, 2);
+  const sMat = new THREE.MeshBasicMaterial({
+    color: sp.isLocal ? 0x00ffff : 0x4488ff, transparent: true,
+    opacity: sp.isLocal ? 0.4 : 0.15,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  const sMesh = new THREE.Mesh(sGeo, sMat);
+  group.add(sMesh);
+  // Orbiting ring
+  const rGeo = new THREE.TorusGeometry(0.45, 0.01, 6, 32);
+  const rMat = new THREE.MeshBasicMaterial({
+    color: sp.isLocal ? 0x00ffff : 0x2266aa, transparent: true,
+    opacity: sp.isLocal ? 0.3 : 0.1,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  const rMesh = new THREE.Mesh(rGeo, rMat);
+  rMesh.rotation.x = Math.PI / 2;
+  group.add(rMesh);
+  // Label
+  const lc = document.createElement('canvas'); lc.width = 256; lc.height = 48;
+  const lx = lc.getContext('2d');
+  lx.fillStyle = sp.isLocal ? '#0ff' : '#4488ff';
+  lx.font = 'bold 18px monospace'; lx.textAlign = 'center';
+  lx.shadowColor = lx.fillStyle; lx.shadowBlur = 8;
+  lx.fillText(sp.label, 128, 30);
+  const lMat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(lc), transparent: true });
+  const lSprite = new THREE.Sprite(lMat);
+  lSprite.scale.set(1.5, 0.3, 1);
+  lSprite.position.y = 0.7;
+  group.add(lSprite);
+  scene.add(group);
+  speakerNodes.push({ group, mesh: sMesh, ring: rMesh, mat: sMat, ...sp });
+});
+// ============================================================
+// 3D WAVEFORM BEAM SYSTEM
+// Particles flow from speaker toward central ball, hit it,
+// and emerge on the opposite side with same harmonic structure
+// ============================================================
+const BEAM_PARTICLE_COUNT = 200;
+const BEAM_SPEED = 4.0;
+class WaveformBeam {
+  constructor(speakerPos, centerPos) {
+    this.speakerPos = speakerPos.clone();
+    this.centerPos = centerPos.clone();
+    this.inDir = new THREE.Vector3().subVectors(centerPos, speakerPos).normalize();
+    this.inLength = speakerPos.distanceTo(centerPos);
+    this.outDir = this.inDir.clone().negate();
+    this.outLength = this.inLength;
+    this.perpA = new THREE.Vector3();
+    this.perpB = new THREE.Vector3();
+    this._computePerpAxes();
+    this.inGeo = new THREE.BufferGeometry();
+    this.inPositions = new Float32Array(BEAM_PARTICLE_COUNT * 3);
+    this.inColors = new Float32Array(BEAM_PARTICLE_COUNT * 3);
+    this.inSizes = new Float32Array(BEAM_PARTICLE_COUNT);
+    this.inGeo.setAttribute('position', new THREE.BufferAttribute(this.inPositions, 3));
+    this.inGeo.setAttribute('color', new THREE.BufferAttribute(this.inColors, 3));
+    this.inGeo.setAttribute('size', new THREE.BufferAttribute(this.inSizes, 1));
+    this.outGeo = new THREE.BufferGeometry();
+    this.outPositions = new Float32Array(BEAM_PARTICLE_COUNT * 3);
+    this.outColors = new Float32Array(BEAM_PARTICLE_COUNT * 3);
+    this.outSizes = new Float32Array(BEAM_PARTICLE_COUNT);
+    this.outGeo.setAttribute('position', new THREE.BufferAttribute(this.outPositions, 3));
+    this.outGeo.setAttribute('color', new THREE.BufferAttribute(this.outColors, 3));
+    this.outGeo.setAttribute('size', new THREE.BufferAttribute(this.outSizes, 1));
+    const beamShader = {
+      vertexShader: `
+        attribute float size;
+        attribute vec3 color;
+        varying vec3 vColor;
+        void main() {
+          vColor = color;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = size * (300.0 / -mvPosition.z);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vColor;
+        void main() {
+          float d = length(gl_PointCoord - 0.5) * 2.0;
+          if (d > 1.0) discard;
+          float glow = exp(-d * d * 2.0);
+          gl_FragColor = vec4(vColor, glow * 0.9);
+        }
+      `
+    };
+    this.inMat = new THREE.ShaderMaterial({
+      ...beamShader, transparent: true, depthWrite: false,
+      blending: THREE.AdditiveBlending, vertexColors: true
+    });
+    this.outMat = new THREE.ShaderMaterial({
+      ...beamShader, transparent: true, depthWrite: false,
+      blending: THREE.AdditiveBlending, vertexColors: true
+    });
+    this.inPoints = new THREE.Points(this.inGeo, this.inMat);
+    this.outPoints = new THREE.Points(this.outGeo, this.outMat);
+    scene.add(this.inPoints);
+    scene.add(this.outPoints);
+    this.energy = 0;
+    this.phase = 0;
+    this.waveformData = new Float32Array(128);
+    this.freqData = new Float32Array(128);
+    this.color = new THREE.Color(0x00ffff);
+    this.activeRings = [];
+    this.visible = false;
+  }
+  _computePerpAxes() {
+    const up = new THREE.Vector3(0, 1, 0);
+    this.perpA.crossVectors(this.inDir, up).normalize();
+    if (this.perpA.length() < 0.01) {
+      this.perpA.crossVectors(this.inDir, new THREE.Vector3(1, 0, 0)).normalize();
+    }
+    this.perpB.crossVectors(this.inDir, this.perpA).normalize();
+  }
+  update(dt, t, energy, waveformData, freqData, phoneme) {
+    this.energy += (energy - this.energy) * 0.15;
+    this.phase += dt * BEAM_SPEED;
+    this.visible = this.energy > 0.005;
+    if (waveformData) this.waveformData.set(waveformData.subarray(0, 128));
+    if (freqData) this.freqData.set(freqData.subarray(0, 128));
+    const phInfo = phoneme ? PHONEME_MAP[phoneme] : null;
+    if (phInfo) {
+      this.color.set(phInfo.hex);
+      this.activeRings = phInfo.rings;
+    } else {
+      this.color.set(0x2244aa);
+      this.activeRings = [];
+    }
+    if (!this.visible) {
+      for (let i = 0; i < BEAM_PARTICLE_COUNT; i++) {
+        this.inSizes[i] *= 0.9;
+        this.outSizes[i] *= 0.9;
+      }
+      this.inGeo.attributes.size.needsUpdate = true;
+      this.outGeo.attributes.size.needsUpdate = true;
+      return;
+    }
+    const eScale = Math.min(1.0, this.energy * 8);
+    // INCOMING BEAM (speaker -> center)
+    for (let i = 0; i < BEAM_PARTICLE_COUNT; i++) {
+      const tParam = i / BEAM_PARTICLE_COUNT;
+      const waveIdx = Math.floor(((tParam + this.phase) % 1.0) * 127);
+      const baseX = this.speakerPos.x + this.inDir.x * tParam * this.inLength;
+      const baseY = this.speakerPos.y + this.inDir.y * tParam * this.inLength;
+      const baseZ = this.speakerPos.z + this.inDir.z * tParam * this.inLength;
+      const waveAmp = this.waveformData[waveIdx] * eScale * 0.8;
+      const freqAmp = (this.freqData[Math.min(127, waveIdx)] + 100) / 100 * 0.1 * eScale;
+      const harmonic = Math.sin(tParam * Math.PI * 8 + this.phase * 6) * freqAmp;
+      const displaceA = (waveAmp + harmonic) * (0.3 + tParam * 0.7);
+      const displaceB = waveAmp * 0.5 * Math.sin(tParam * Math.PI * 4 + this.phase * 4) * (0.3 + tParam * 0.7);
+      this.inPositions[i*3]   = baseX + this.perpA.x * displaceA + this.perpB.x * displaceB;
+      this.inPositions[i*3+1] = baseY + this.perpA.y * displaceA + this.perpB.y * displaceB;
+      this.inPositions[i*3+2] = baseZ + this.perpA.z * displaceA + this.perpB.z * displaceB;
+      const colorIntensity = 0.3 + tParam * 0.7;
+      this.inColors[i*3]   = this.color.r * colorIntensity;
+      this.inColors[i*3+1] = this.color.g * colorIntensity;
+      this.inColors[i*3+2] = this.color.b * colorIntensity;
+      this.inSizes[i] = (0.03 + tParam * 0.08 + Math.abs(waveAmp) * 0.15) * eScale;
+    }
+    // OUTGOING BEAM (center -> opposite side)
+    for (let i = 0; i < BEAM_PARTICLE_COUNT; i++) {
+      const tParam = i / BEAM_PARTICLE_COUNT;
+      const waveIdx = Math.floor(((1.0 - tParam + this.phase) % 1.0) * 127);
+      const dist = tParam * this.outLength;
+      const baseX = this.centerPos.x + this.outDir.x * dist;
+      const baseY = this.centerPos.y + this.outDir.y * dist;
+      const baseZ = this.centerPos.z + this.outDir.z * dist;
+      const spread = 1.0 + tParam * 1.5;
+      const attenuation = 1.0 - tParam * 0.6;
+      const waveAmp = this.waveformData[waveIdx] * eScale * 0.8 * attenuation;
+      const freqAmp = (this.freqData[Math.min(127, waveIdx)] + 100) / 100 * 0.1 * eScale * attenuation;
+      const harmonic = Math.sin(tParam * Math.PI * 8 - this.phase * 6) * freqAmp;
+      const displaceA = (waveAmp + harmonic) * spread;
+      const displaceB = waveAmp * 0.5 * Math.sin(tParam * Math.PI * 4 - this.phase * 4) * spread;
+      this.outPositions[i*3]   = baseX + this.perpA.x * displaceA + this.perpB.x * displaceB;
+      this.outPositions[i*3+1] = baseY + this.perpA.y * displaceA + this.perpB.y * displaceB;
+      this.outPositions[i*3+2] = baseZ + this.perpA.z * displaceA + this.perpB.z * displaceB;
+      const exitHue = 0.15 + tParam * 0.1;
+      this.outColors[i*3]   = this.color.r * attenuation + exitHue * 0.2;
+      this.outColors[i*3+1] = this.color.g * attenuation * 0.9;
+      this.outColors[i*3+2] = this.color.b * attenuation * 0.8;
+      this.outSizes[i] = (0.06 + (1.0 - tParam) * 0.06 + Math.abs(waveAmp) * 0.12) * eScale * attenuation;
+    }
+    this.inGeo.attributes.position.needsUpdate = true;
+    this.inGeo.attributes.color.needsUpdate = true;
+    this.inGeo.attributes.size.needsUpdate = true;
+    this.outGeo.attributes.position.needsUpdate = true;
+    this.outGeo.attributes.color.needsUpdate = true;
+    this.outGeo.attributes.size.needsUpdate = true;
+  }
+  dispose() {
+    scene.remove(this.inPoints);
+    scene.remove(this.outPoints);
+    this.inGeo.dispose(); this.outGeo.dispose();
+    this.inMat.dispose(); this.outMat.dispose();
+  }
+}
+// Create beams for each speaker
+const beams = [];
+SPEAKER_POSITIONS.forEach(sp => {
+  beams.push(new WaveformBeam(sp.pos, centralGroup.position));
+});
+// ============================================================
+// IMPACT RIPPLE SYSTEM
+// ============================================================
+const ripples = [];
+function spawnRipple(color, intensity) {
+  const geo = new THREE.RingGeometry(0.9, 1.1, 48);
+  const mat = new THREE.MeshBasicMaterial({
+    color, transparent: true, opacity: intensity * 0.6,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.copy(centralGroup.position);
+  mesh.rotation.x = Math.random() * Math.PI;
+  mesh.rotation.y = Math.random() * Math.PI;
+  scene.add(mesh);
+  ripples.push({ mesh, life: 1.0, speed: 2 + intensity * 3 });
+}
+function updateRipples(dt) {
+  for (let i = ripples.length - 1; i >= 0; i--) {
+    const r = ripples[i];
+    r.life -= dt * 0.8;
+    r.mesh.scale.addScalar(dt * r.speed);
+    r.mesh.material.opacity = r.life * 0.4;
+    if (r.life <= 0) {
+      scene.remove(r.mesh);
+      r.mesh.geometry.dispose();
+      r.mesh.material.dispose();
+      ripples.splice(i, 1);
+    }
+  }
+}
+// ============================================================
+// AMBIENT PARTICLES
+// ============================================================
+const AMBIENT_COUNT = 400;
+const ambGeo = new THREE.BufferGeometry();
+const ambPos = new Float32Array(AMBIENT_COUNT * 3);
+const ambCols = new Float32Array(AMBIENT_COUNT * 3);
+for (let i = 0; i < AMBIENT_COUNT; i++) {
+  ambPos[i*3] = (Math.random()-0.5) * 25;
+  ambPos[i*3+1] = Math.random() * 8;
+  ambPos[i*3+2] = (Math.random()-0.5) * 25;
+  ambCols[i*3] = 0.1; ambCols[i*3+1] = 0.2 + Math.random()*0.15; ambCols[i*3+2] = 0.5 + Math.random()*0.3;
+}
+ambGeo.setAttribute('position', new THREE.BufferAttribute(ambPos, 3));
+ambGeo.setAttribute('color', new THREE.BufferAttribute(ambCols, 3));
+const ambMat = new THREE.PointsMaterial({
+  size: 0.06, vertexColors: true, transparent: true, opacity: 0.3,
+  blending: THREE.AdditiveBlending, depthWrite: false
+});
+scene.add(new THREE.Points(ambGeo, ambMat));
+// Lighting
+scene.add(new THREE.AmbientLight(0x222244, 0.4));
+const pointLight = new THREE.PointLight(0x4488ff, 0.6, 25);
+pointLight.position.set(0, 4, 0);
+scene.add(pointLight);
+// ============================================================
+// HUD SETUP
+// ============================================================
+function buildVagalHUD() {
+  const container = document.getElementById('vagalZones');
+  VAGAL_ZONES.forEach((vz, i) => {
+    const d = document.createElement('div');
+    d.className = 'vagal-zone';
+    d.id = 'vz-' + i;
+    d.innerHTML =
+      '<div class="vagal-dot" style="color:' + vz.colorStr + ';border-color:' + vz.colorStr + '"></div>' +
+      '<span class="vagal-name" style="color:' + vz.colorStr + '">' + vz.ring + ' ' + vz.name.toUpperCase() + '</span>' +
+      '<span class="vagal-prime">p=' + vz.prime + '</span>';
+    container.appendChild(d);
+  });
+}
+buildVagalHUD();
+// ============================================================
+// CONTROLS
+// ============================================================
+let micActive = true;
+let orbitEnabled = true;
+let camAngle = 0;
+window.toggleMic = () => {
+  micActive = !micActive;
+  const btn = document.getElementById('micBtn');
+  if (micActive) { btn.className = 'bottom-btn active'; btn.innerHTML = '<span class="icon">&#9899;</span> MIC ON'; }
+  else { btn.className = 'bottom-btn muted'; btn.innerHTML = '<span class="icon">&#9898;</span> MUTED'; }
+  if (KI.stream) KI.stream.getAudioTracks().forEach(t => t.enabled = micActive);
+};
+window.toggleOrbit = () => {
+  orbitEnabled = !orbitEnabled;
+  const btn = document.getElementById('orbitBtn');
+  btn.classList.toggle('active', orbitEnabled);
+};
+// ============================================================
+// RIPPLE SPAWN TIMER
+// ============================================================
+let rippleTimer = 0;
+// ============================================================
+// MAIN UPDATE & RENDER LOOP
+// ============================================================
+function updateScene(dt, t) {
+  starMat.uniforms.uTime.value = t;
+  // Camera orbit
+  if (orbitEnabled) {
+    camAngle += dt * 0.15;
+    camera.position.x = Math.sin(camAngle) * 14;
+    camera.position.z = Math.cos(camAngle) * 14;
+    camera.position.y = 3.5 + Math.sin(camAngle * 0.3) * 1.0;
+    camera.lookAt(centralGroup.position);
+  }
+  // Central ball animation
+  coreMesh.rotation.y = t * 0.15;
+  coreMesh.rotation.x = Math.sin(t * 0.3) * 0.1;
+  innerGlow.scale.setScalar(1 + Math.sin(t * 2) * 0.05);
+  floor.rotation.z = t * 0.01;
+  const v = KI.voice;
+  const energy = v.energy;
+  const phoneme = v.vowel;
+  const phInfo = phoneme ? PHONEME_MAP[phoneme] : null;
+  // Get waveform + freq data
+  let timeData = null, freqDataArr = null;
+  if (KI.analyser) {
+    timeData = new Float32Array(128);
+    freqDataArr = new Float32Array(128);
+    KI.analyser.getFloatTimeDomainData(timeData);
+    KI.analyser.getFloatFrequencyData(freqDataArr);
+  }
+  // Central ball reacts to incoming sound
+  const ballScale = 1 + energy * 3;
+  coreMesh.scale.setScalar(ballScale);
+  innerGlow.scale.setScalar(ballScale * 0.9 + Math.sin(t * 2) * 0.05);
+  coreMat.opacity = 0.1 + energy * 0.5;
+  innerGlowMat.opacity = 0.05 + energy * 0.3;
+  outerGlowMat.opacity = energy * 0.2;
+  if (phInfo) {
+    coreMat.color.set(phInfo.hex);
+    innerGlowMat.color.set(phInfo.hex);
+    outerGlowMat.color.set(phInfo.hex);
+    pointLight.color.set(phInfo.hex);
+    pointLight.intensity = 0.5 + energy * 3;
+  } else {
+    coreMat.color.setHex(0x224488);
+    innerGlowMat.color.setHex(0x2244aa);
+    pointLight.color.setHex(0x4488ff);
+    pointLight.intensity = 0.5;
+  }
+  // Update vagal rings based on active phoneme
+  vagalRings.forEach((vr, i) => {
+    const isActive = phInfo && phInfo.rings.includes(i);
+    vr.active = isActive;
+    const targetOpacity = isActive ? (0.3 + energy * 2) : 0.03;
+    vr.mesh.material.opacity += (targetOpacity - vr.mesh.material.opacity) * 0.1;
+    if (isActive) {
+      const pulse = 1 + Math.sin(t * (3 + i * 0.7)) * 0.06 * (1 + energy * 2);
+      vr.mesh.scale.setScalar(pulse);
+      vr.mesh.rotation.z = t * (0.2 + i * 0.1);
+      vr.mesh.material.color.setHex(vr.zone.color);
+    } else {
+      vr.mesh.rotation.z = t * 0.05;
+    }
+  });
+  // Update local speaker beam (index 0)
+  if (beams[0]) {
+    beams[0].update(dt, t, micActive ? energy : 0, timeData, freqDataArr, phoneme);
+  }
+  // Simulate demo beams from other speakers
+  for (let i = 1; i < beams.length; i++) {
+    const simEnergy = Math.sin(t * (0.5 + i * 0.3)) * 0.01 + 0.005;
+    const simWave = new Float32Array(128);
+    for (let j = 0; j < 128; j++) {
+      simWave[j] = Math.sin(j * 0.1 + t * 2 + i) * simEnergy * 2;
+    }
+    const simFreq = new Float32Array(128);
+    simFreq.fill(-80);
+    beams[i].update(dt, t, simEnergy, simWave, simFreq, null);
+  }
+  // Spawn ripples when energy is high
+  rippleTimer += dt;
+  if (energy > 0.03 && rippleTimer > 0.15) {
+    rippleTimer = 0;
+    const rippleColor = phInfo ? phInfo.hex : 0x2244aa;
+    spawnRipple(rippleColor, Math.min(1, energy * 5));
+  }
+  updateRipples(dt);
+  // Update speaker node visuals
+  speakerNodes.forEach((sn, i) => {
+    const e = i === 0 ? energy : Math.max(0, Math.sin(t * (0.5 + i * 0.3)) * 0.01);
+    sn.mat.opacity = (sn.isLocal ? 0.2 : 0.1) + e * 2;
+    sn.ring.rotation.z = t * (0.5 + i * 0.2);
+    sn.ring.scale.setScalar(1 + e * 2);
+    sn.mesh.scale.setScalar(1 + e * 3);
+    if (sn.isLocal && phInfo) {
+      sn.mat.color.set(phInfo.hex);
+      sn.ring.material.color.set(phInfo.hex);
+    }
+    sn.group.position.y = sn.pos.y + Math.sin(t + i * 0.5) * 0.1;
+  });
+  // Ambient particles drift
+  for (let i = 0; i < AMBIENT_COUNT; i++) {
+    ambPos[i*3] += Math.sin(t * 0.1 + i * 0.5) * 0.002;
+    ambPos[i*3+1] += Math.cos(t * 0.12 + i * 0.3) * 0.001;
+    ambPos[i*3+2] += Math.sin(t * 0.08 + i * 0.7) * 0.002;
+    if (energy > 0.02 && phInfo) {
+      const c = new THREE.Color(phInfo.hex);
+      ambCols[i*3]   += (c.r * 0.3 - ambCols[i*3]) * 0.02;
+      ambCols[i*3+1] += (c.g * 0.3 - ambCols[i*3+1]) * 0.02;
+      ambCols[i*3+2] += (c.b * 0.3 - ambCols[i*3+2]) * 0.02;
+    }
+  }
+  ambGeo.attributes.position.needsUpdate = true;
+  ambGeo.attributes.color.needsUpdate = true;
+  ambMat.opacity = 0.2 + energy * 0.4;
+  // === HUD UPDATES ===
+  const vagalHUD = document.getElementById('vagalHUD');
+  const phonemeHUD = document.getElementById('phonemeHUD');
+  const resHUD = document.getElementById('resHUD');
+  const waveInfo = document.getElementById('waveInfo');
+  if (v.sounding || energy > 0.01) {
+    vagalHUD.classList.add('on');
+    waveInfo.classList.add('on');
+    if (phInfo) phonemeHUD.classList.add('on');
+    else phonemeHUD.classList.remove('on');
+  } else {
+    vagalHUD.classList.remove('on');
+    phonemeHUD.classList.remove('on');
+    waveInfo.classList.remove('on');
+  }
+  // Update vagal zone indicators
+  VAGAL_ZONES.forEach((vz, i) => {
+    const el = document.getElementById('vz-' + i);
+    if (!el) return;
+    const isActive = phInfo && phInfo.rings.includes(i);
+    el.classList.toggle('active', isActive);
+    el.classList.toggle('peak', isActive && energy > 0.08);
+  });
+  // Update phoneme HUD
+  if (phInfo) {
+    document.getElementById('phonemeChar').textContent = phInfo.kanji;
+    document.getElementById('phonemeChar').style.color = phInfo.color;
+    document.getElementById('phonemeIPA').textContent = phInfo.ipa;
+    document.getElementById('phonemeType').textContent = phInfo.type;
+    document.getElementById('phonemeMode').textContent = phInfo.mode;
+    document.getElementById('phonemeRings').textContent = phInfo.rings.map(r => 'R' + r).join(' + ');
+  }
+  // Wave info
+  document.getElementById('waveF0').textContent = 'F0: ' + (v.f0 > 0 ? Math.round(v.f0) + ' Hz' : '---');
+  document.getElementById('waveEnergy').textContent = 'ENERGY: ' + Math.round(energy * 100) + '%';
+  // Resonance HUD
+  if (v.sustain > 0.3) {
+    resHUD.classList.add('on');
+    if (phInfo) {
+      document.getElementById('resKanji').textContent = phInfo.kanji;
+      document.getElementById('resKanji').style.color = phInfo.color;
+    }
+    document.getElementById('resSustain').textContent = v.sustain.toFixed(1) + 's';
+    const sustainMult = Math.floor(1 + v.sustain / 0.8);
+    const multEl = document.getElementById('resMultiplier');
+    if (sustainMult > 1) {
+      multEl.textContent = sustainMult + 'x';
+      multEl.classList.add('on');
+    } else {
+      multEl.classList.remove('on');
+    }
+    const thresholds = [0.3, 0.8, 1.5, 2.5, 4.0];
+    let currentThresh = 0, nextThresh = 0.3;
+    for (let i = thresholds.length - 1; i >= 0; i--) {
+      if (v.sustain >= thresholds[i]) {
+        currentThresh = thresholds[i];
+        nextThresh = thresholds[i + 1] || thresholds[i] + 2;
+        break;
+      }
+    }
+    const progress = (v.sustain - currentThresh) / (nextThresh - currentThresh);
+    document.getElementById('resProgressFill').style.width = (Math.min(1, progress) * 100) + '%';
+    if (phInfo) document.getElementById('resProgressFill').style.background = phInfo.color;
+  } else {
+    resHUD.classList.remove('on');
+  }
+}
+// ============================================================
+// BOOT
+// ============================================================
+async function boot() {
+  try { await VoiceEngine.init(); } catch(e) { console.warn('Mic access failed:', e); }
+  KI.running = true;
+  const clk = KI.clock;
+  (function animate() {
+    if (!KI.running) return;
+    requestAnimationFrame(animate);
+    const dt = clk.getDelta(), t = clk.elapsedTime;
+    KI.runUpdates(dt, t);
+    updateScene(dt, t);
+    renderer.render(scene, camera);
+  })();
+  console.log('%c AUDIOFABRIC 3D VAGAL WAVEFORM ', 'background:#0a0a14;color:#0ff;font-size:18px;padding:8px');
+  console.log('%c ASS-OS-PHONEME-001 v1.0 — fold(voice) = 510510 ', 'background:#111;color:#ff08;font-size:11px;padding:4px');
+}
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>

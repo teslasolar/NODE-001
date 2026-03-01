@@ -2,37 +2,84 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="refresh" content="0;url=viz/index.html">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NODE-001 · Garden of Eden</title>
+<title>NODE-001 · Visualization Hub</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#050308;color:#ffd700;font-family:Georgia,serif;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column}
-h1{font-size:2.5rem;letter-spacing:0.3em;margin-bottom:0.5rem}
-p{color:#556;font-size:0.8rem;margin-bottom:1.5rem}
-a{color:#0af;text-decoration:none;font-family:'Courier New',monospace;font-size:0.75rem;padding:8px 20px;border:1px solid rgba(0,170,255,0.2);border-radius:4px;transition:all 0.2s}
-a:hover{background:rgba(0,170,255,0.1);border-color:#0af}
-.nav{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:1rem}
-.sub{color:#334;font-size:0.55rem;margin-top:2rem;text-align:center;max-width:500px;line-height:1.6}
+body{background:#050308;color:#ccd;font-family:'Courier New',monospace;
+  display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column}
+
+/* Animated starfield background */
+body::before{content:'';position:fixed;inset:0;z-index:0;
+  background:radial-gradient(ellipse at 30% 20%,rgba(0,40,80,0.15),transparent 60%),
+             radial-gradient(ellipse at 70% 80%,rgba(60,0,80,0.1),transparent 50%),
+             #050308}
+
+.wrap{position:relative;z-index:1;text-align:center;padding:40px 20px;max-width:680px;width:100%}
+
+h1{font-family:Georgia,serif;font-size:2.8rem;letter-spacing:0.35em;color:#ffd700;margin-bottom:4px;
+  text-shadow:0 0 30px rgba(255,215,0,0.15)}
+.tagline{color:#445;font-size:0.7rem;letter-spacing:3px;margin-bottom:40px}
+
+/* Navigation cards */
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:40px}
+@media(max-width:520px){.cards{grid-template-columns:1fr}}
+
+.card{background:rgba(10,8,20,0.85);border:1px solid rgba(255,255,255,0.06);
+  border-radius:8px;padding:24px 20px;text-align:left;text-decoration:none;
+  transition:all 0.3s;position:relative;overflow:hidden;display:block}
+.card:hover{border-color:rgba(0,170,255,0.25);transform:translateY(-2px);
+  box-shadow:0 8px 30px rgba(0,0,0,0.4)}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0;
+  transition:opacity 0.3s}
+.card:hover::before{opacity:1}
+
+.card-icon{font-size:28px;margin-bottom:10px;display:block;
+  filter:drop-shadow(0 0 8px var(--accent))}
+.card-title{color:#fff;font-size:0.85rem;font-weight:bold;letter-spacing:2px;margin-bottom:6px}
+.card-desc{color:#556;font-size:0.6rem;line-height:1.6;letter-spacing:0.5px}
+.card-tag{display:inline-block;margin-top:10px;font-size:0.5rem;letter-spacing:2px;
+  padding:3px 8px;border-radius:3px;background:rgba(255,255,255,0.03);
+  color:var(--accent);border:1px solid rgba(255,255,255,0.04)}
+
+/* Footer */
+.footer{color:#223;font-size:0.5rem;line-height:1.8;letter-spacing:1px;max-width:500px;text-align:center}
+.footer strong{color:#334;font-weight:normal}
 </style>
 </head>
 <body>
-<h1>NODE</h1>
-<p>Wearable AI Companion System · 127D Garden of Eden</p>
-<div class="nav">
-  <a href="viz/index.html">Enter Garden</a>
-</div>
-<div class="sub">
-  ASS-OS Ring/Bus Architecture · KONOMI Standard · P2P Mesh<br>
-  Medical Assistive Device · NODE-SPEC-001 Rev 0.1<br>
-  DuCrest + Frumkin
-</div>
+<div class="wrap">
+  <h1>NODE</h1>
+  <div class="tagline">WEARABLE AI COMPANION SYSTEM &middot; VISUALIZATION HUB</div>
 
-<script>
-// Auto-redirect after meta refresh fallback
-if (!document.querySelector('meta[http-equiv="refresh"]').content) {
-  window.location.href = 'viz/index.html';
-}
-</script>
+  <div class="cards">
+    <a class="card" href="viz/index.html" style="--accent:#ffd700">
+      <span class="card-icon">&#10022;</span>
+      <div class="card-title">GARDEN OF EDEN</div>
+      <div class="card-desc">
+        127-dimensional shield visualization. Ring/Bus architecture,
+        golden-ratio flower garden, ISA-95 pipeline telemetry.
+      </div>
+      <span class="card-tag">3D &middot; THREE.JS &middot; 7 RINGS &middot; 4 BUSES</span>
+    </a>
+
+    <a class="card" href="viz/audiofabric/index.html" style="--accent:#0ff">
+      <span class="card-icon">&#9835;</span>
+      <div class="card-title">AUDIOFABRIC</div>
+      <div class="card-desc">
+        3D vagal waveform visualization. Live microphone input,
+        phoneme classification, vagal zone mapping, resonance tracking.
+      </div>
+      <span class="card-tag">AUDIO &middot; WAVEFORM &middot; VAGAL &middot; MIC</span>
+    </a>
+  </div>
+
+  <div class="footer">
+    ASS-OS Ring/Bus Architecture &middot; KONOMI Standard &middot; P2P Mesh<br>
+    <strong>Medical Assistive Device &middot; NODE-SPEC-001 Rev 0.1</strong><br>
+    DuCrest + Frumkin
+  </div>
+</div>
 </body>
 </html>
