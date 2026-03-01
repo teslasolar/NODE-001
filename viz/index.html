@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NODE-001 · Garden of Eden · 127D</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #050308; overflow: hidden; font-family: 'Courier New', monospace; color: #aac; }
+canvas { display: block; position: fixed; top: 0; left: 0; }
+
+/* ─── TOP BAR ───────────────────────────────────────────────────────── */
+#top-bar {
+  position: fixed; top: 0; left: 0; right: 0;
+  padding: 5px 12px;
+  background: rgba(5,3,8,0.88);
+  border-bottom: 1px solid rgba(0,170,255,0.12);
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 9px; letter-spacing: 2px; z-index: 20;
+}
+.top-left { color: #ffd700; }
+.top-center { color: #556; font-size: 7px; }
+.top-right { color: #445; }
+
+/* ─── PANELS (shared) ───────────────────────────────────────────────── */
+.panel {
+  position: fixed;
+  background: rgba(5,3,8,0.92);
+  border: 1px solid rgba(255,215,0,0.08);
+  border-radius: 4px;
+  padding: 6px 8px;
+  backdrop-filter: blur(8px);
+  z-index: 20;
+}
+.panel-title {
+  color: #ffd700; font-size: 7px; letter-spacing: 2px;
+  margin-bottom: 5px; opacity: 0.7;
+}
+
+/* ─── ISA PANEL (left) ──────────────────────────────────────────────── */
+#isa-panel { top: 30px; left: 8px; width: 170px; font-size: 7px; }
+.isa-level {
+  padding: 3px 5px; margin-bottom: 2px; border-radius: 2px;
+  cursor: pointer; border-left: 2px solid transparent;
+  transition: all 0.2s;
+}
+.isa-level:hover { background: rgba(255,255,255,0.03); }
+.isa-level.active { background: rgba(0,170,255,0.06); }
+.isa-name { font-weight: bold; letter-spacing: 1px; font-size: 7px; }
+.isa-desc { color: #445; font-size: 6px; margin-top: 1px; }
+
+.pipeline-stage {
+  display: flex; align-items: center; gap: 4px;
+  padding: 2px 4px; font-size: 6.5px;
+}
+.ps-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.ps-name { font-weight: bold; letter-spacing: 1px; }
+.ps-ring { color: #445; margin-left: auto; }
+
+/* ─── SHIELD PANEL (right) ──────────────────────────────────────────── */
+#shield-panel { top: 30px; right: 8px; width: 195px; font-size: 7px; }
+.shield-row {
+  display: flex; align-items: center; gap: 4px; margin-bottom: 3px;
+}
+.sh-id { width: 20px; font-weight: bold; font-size: 8px; }
+.sh-bar-wrap {
+  flex: 1; height: 6px; background: #0a0a14;
+  border-radius: 3px; overflow: hidden;
+}
+.sh-bar { height: 100%; border-radius: 3px; transition: width 0.5s; }
+.sh-val { width: 22px; text-align: right; font-size: 7px; }
+.sh-status { width: 12px; text-align: center; font-size: 8px; }
+
+.bus-section {
+  margin-top: 6px; padding-top: 5px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.bus-title { color: #445; letter-spacing: 2px; margin-bottom: 4px; font-size: 6px; }
+.bus-row {
+  display: flex; align-items: center; gap: 4px; margin-bottom: 2px;
+}
+.bus-label { width: 42px; font-size: 6px; letter-spacing: 1px; }
+.bus-bar-wrap { flex: 1; }
+.bus-bar { height: 3px; border-radius: 2px; transition: width 0.4s; }
+.bus-pct { width: 22px; text-align: right; font-size: 6px; color: #445; }
+
+/* ─── TOOLTIP ───────────────────────────────────────────────────────── */
+#tooltip {
+  position: absolute;
+  background: rgba(5,3,8,0.96);
+  border: 1px solid rgba(255,215,0,0.2);
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 0.65rem;
+  pointer-events: none;
+  opacity: 0; transition: opacity 0.12s;
+  z-index: 50; max-width: 260px;
+}
+#tooltip.visible { opacity: 1; }
+#tooltip-path { color: #ffd700; font-weight: 600; margin-bottom: 2px; word-break: break-all; }
+#tooltip-meta { opacity: 0.6; font-size: 0.55rem; }
+
+/* ─── FILE PANEL (modal) ────────────────────────────────────────────── */
+#file-panel {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 420px; max-width: 90vw;
+  display: none; flex-direction: column;
+  z-index: 100;
+}
+#file-panel.visible { display: flex; }
+#file-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255,215,0,0.1);
+  margin-bottom: 5px;
+}
+#file-title { color: #ffd700; font-size: 0.75rem; word-break: break-all; }
+#file-close {
+  background: none; border: none; color: #fff8e7;
+  font-size: 1.1rem; cursor: pointer; opacity: 0.4;
+}
+#file-close:hover { opacity: 1; }
+#file-detail-meta {
+  font-size: 0.55rem; opacity: 0.4; margin-bottom: 5px;
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+#file-detail-meta span {
+  padding: 1px 5px; background: rgba(255,255,255,0.04);
+  border-radius: 3px;
+}
+.file-ring-info {
+  margin-top: 4px; padding: 5px 7px;
+  border-left: 2px solid; border-radius: 3px;
+  background: rgba(255,255,255,0.02);
+  font-size: 0.6rem;
+}
+.file-ring-desc { color: #556; font-size: 0.55rem; }
+
+/* ─── BOTTOM METRICS ────────────────────────────────────────────────── */
+#metrics {
+  position: fixed; bottom: 38px; left: 10px; right: 10px;
+  display: flex; justify-content: space-around;
+  z-index: 20; font-size: 7px;
+}
+.metric { text-align: center; }
+.metric .v { font-size: 13px; font-weight: bold; }
+.metric .u { color: #445; font-size: 6px; letter-spacing: 1px; }
+
+/* ─── CONTROLS ──────────────────────────────────────────────────────── */
+#controls {
+  position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%);
+  z-index: 20; display: flex; gap: 3px;
+}
+#controls button {
+  background: rgba(0,170,255,0.06);
+  border: 1px solid rgba(0,170,255,0.12);
+  color: #0af; padding: 3px 8px;
+  font: inherit; font-size: 7px; cursor: pointer;
+  border-radius: 3px; letter-spacing: 1px;
+}
+#controls button:hover { background: rgba(0,170,255,0.12); }
+#controls button.active { background: rgba(0,170,255,0.2); border-color: #0af; }
+#controls button.gold { border-color: rgba(255,215,0,0.2); color: #ffd700; }
+#controls button.warn { border-color: rgba(255,100,50,0.2); color: #f64; }
+
+/* ─── STATUS (bottom-right) ─────────────────────────────────────────── */
+#status-info {
+  position: fixed; bottom: 8px; right: 8px;
+  font-size: 6px; opacity: 0.3; z-index: 20;
+  text-align: right;
+}
+
+/* ─── HINT ──────────────────────────────────────────────────────────── */
+#hint {
+  position: fixed; bottom: 8px; left: 8px;
+  font-size: 6px; opacity: 0.25; z-index: 20;
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="top-bar">
+  <span class="top-left">NODE-001 · 127D GARDEN OF EDEN</span>
+  <span class="top-center">ASS-OS RING/BUS · KONOMI STANDARD · P2P MESH</span>
+  <span class="top-right" id="clock">T+00:00:00</span>
+</div>
+
+<!-- LEFT: ISA + Pipeline -->
+<div id="isa-panel" class="panel"></div>
+
+<!-- RIGHT: Shields + Buses -->
+<div id="shield-panel" class="panel"></div>
+
+<!-- TOOLTIP -->
+<div id="tooltip">
+  <div id="tooltip-path"></div>
+  <div id="tooltip-meta"></div>
+</div>
+
+<!-- FILE DETAIL PANEL -->
+<div id="file-panel" class="panel">
+  <div id="file-header">
+    <span id="file-title"></span>
+    <button id="file-close">&times;</button>
+  </div>
+  <div id="file-detail-meta"></div>
+  <div id="file-ring"></div>
+</div>
+
+<!-- BOTTOM METRICS -->
+<div id="metrics">
+  <div class="metric"><div class="v" id="m-integrity">50</div><div class="u">SHIELD %</div></div>
+  <div class="metric"><div class="v" id="m-coherence">0</div><div class="u">&phi; COHERENCE</div></div>
+  <div class="metric"><div class="v" id="m-files">0</div><div class="u">FILES</div></div>
+  <div class="metric"><div class="v" id="m-modules">0</div><div class="u">MODULES</div></div>
+  <div class="metric"><div class="v" id="m-threat">NONE</div><div class="u">THREAT</div></div>
+  <div class="metric"><div class="v" id="m-psi">0.00</div><div class="u">&psi; LEVEL</div></div>
+</div>
+
+<!-- CONTROLS -->
+<div id="controls">
+  <button onclick="setShieldMode('idle')">STANDBY</button>
+  <button onclick="setShieldMode('patrol')" class="active">PATROL</button>
+  <button onclick="setShieldMode('alert')">ALERT</button>
+  <button onclick="setShieldMode('prime')" class="gold">PRIME &phi;</button>
+  <button onclick="setShieldMode('fortress')">FORTRESS</button>
+  <button onclick="setShieldMode('reflect')" class="gold">MIRROR</button>
+  <button onclick="setShieldMode('collapse')" class="warn">COLLAPSE</button>
+</div>
+
+<!-- STATUS -->
+<div id="status-info">
+  drag: orbit · scroll: zoom · click flower: inspect<br>
+  NODE-SPEC-001 Rev 0.1 · DuCrest + Frumkin
+</div>
+
+<div id="hint">127 dimensions · 7 rings · 4 buses · 45 files · 48 tests passing</div>
+
+<!-- CANVAS -->
+<canvas id="canvas"></canvas>
+
+<!-- SCRIPTS (modular) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="constants.js"></script>
+<script src="scene.js"></script>
+<script src="orb.js"></script>
+<script src="garden.js"></script>
+<script src="particles.js"></script>
+<script src="pipeline.js"></script>
+<script src="hud.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════════════════
+// MAIN — Initialize and animate
+// ════════════════════════════════════════════════════════════════════════
+
+initScene();
+initOrb();
+initGarden();
+initConnections();
+initParticles();
+initPipeline();
+initHUD();
+
+// Set initial shield mode
+setShieldMode('patrol');
+
+// Highlight active control button
+document.querySelectorAll('#controls button').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════
+// RENDER LOOP
+// ════════════════════════════════════════════════════════════════════════
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  updateCamera(t);
+  const orbMetrics = updateOrb(t);
+  updateGarden(t);
+  updateParticles(t);
+  updatePipeline(t);
+  updateHUD(orbMetrics);
+
+  renderer.render(scene, camera);
+}
+
+animate();
+</script>
+</body>
+</html>
