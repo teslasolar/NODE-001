@@ -18,6 +18,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 #topbar .status{margin-left:auto;font-size:11px;color:var(--dim)}
 #topbar button{background:#222238;color:var(--text);border:1px solid var(--border);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;font-family:inherit}
 #topbar button:hover{border-color:var(--accent);color:var(--accent)}
+#topbar button.active-tab{background:var(--accent);color:#000;border-color:var(--accent)}
+#topbar .sep{width:1px;height:20px;background:var(--border)}
 #topbar .nav-back{color:var(--dim);text-decoration:none;font-size:11px;padding:4px 10px;
   border:1px solid var(--border);border-radius:4px;transition:all 0.2s}
 #topbar .nav-back:hover{color:var(--accent);border-color:var(--accent)}
@@ -25,8 +27,27 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 #grid{display:grid;grid-template-columns:220px 1fr 340px;grid-template-rows:1fr 1fr;height:calc(100vh - 38px);gap:1px;background:var(--border)}
 #file-panel{grid-row:1/3;background:var(--panel);overflow:hidden;display:flex;flex-direction:column}
 #preview-area{grid-row:1/2;background:#0d0d18;position:relative;overflow:hidden}
-#tool-viz{grid-row:2/2;background:var(--panel);overflow:hidden;display:flex;flex-direction:column}
+#bottom-panel{grid-row:2/2;background:var(--panel);overflow:hidden;display:flex;flex-direction:column;position:relative}
 #chat-panel{grid-row:1/3;background:var(--panel);display:flex;flex-direction:column;overflow:hidden}
+/* Bottom panel tab bar */
+#bottom-tabs{display:flex;gap:2px;padding:2px 4px;background:#0a0a14;border-bottom:1px solid var(--border);flex-shrink:0}
+.bottom-tab{padding:3px 10px;font-size:10px;color:var(--dim);cursor:pointer;border-radius:3px 3px 0 0;
+  border:1px solid transparent;border-bottom:none;text-transform:uppercase;letter-spacing:0.5px}
+.bottom-tab:hover{color:var(--text)}
+.bottom-tab.active{color:var(--accent);background:var(--panel);border-color:var(--border)}
+.bottom-view{display:none;flex:1;overflow:hidden}
+.bottom-view.active{display:flex;flex-direction:column}
+/* Template modal */
+#template-modal{display:none;position:fixed;inset:0;z-index:200;background:rgba(5,5,10,0.85);
+  align-items:center;justify-content:center}
+#template-modal.open{display:flex}
+#template-list{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px;
+  width:400px;max-height:80vh;overflow-y:auto}
+#template-list h3{color:var(--accent);font-size:14px;margin-bottom:12px;letter-spacing:1px}
+.tpl-item{padding:10px;border:1px solid var(--border);border-radius:6px;margin-bottom:8px;cursor:pointer;transition:all 0.2s}
+.tpl-item:hover{border-color:var(--accent);background:rgba(68,170,255,0.05)}
+.tpl-item .tpl-name{color:var(--text);font-size:12px;font-weight:bold}
+.tpl-item .tpl-desc{color:var(--dim);font-size:11px;margin-top:2px}
 /* ─── File Explorer ─── */
 #file-panel .panel-header{padding:8px 10px;border-bottom:1px solid var(--border);font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;justify-content:space-between}
 #file-list{flex:1;overflow-y:auto;padding:4px 0}
@@ -56,8 +77,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 #iframe-container iframe{width:100%;height:100%;border:none;background:#fff}
 #no-preview{position:absolute;top:30px;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px;flex-direction:column;gap:8px}
 #no-preview .hint{font-size:11px;color:#445}
-/* ─── Tool Visualization ─── */
-#tool-viz .panel-header{padding:6px 10px;border-bottom:1px solid var(--border);font-size:11px;color:var(--purple);text-transform:uppercase;letter-spacing:1px;display:flex;justify-content:space-between;align-items:center}
+/* ─── Tool / Bottom Panel ─── */
 #tool-log{flex:1;overflow-y:auto;padding:4px 0}
 .tool-entry{padding:6px 10px;border-bottom:1px solid rgba(42,42,58,.5);font-size:11px}
 .tool-entry .tool-name{color:var(--purple);font-weight:bold}
@@ -146,8 +166,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   <span class="logo">LLM SANDBOX</span>
   <span class="repo-name" id="repo-name-display">untitled</span>
   <span class="branch" id="branch-display">main</span>
-  <button id="btn-new-repo" title="New Repo">New Repo</button>
+  <button id="btn-new-repo" title="New Repo">New</button>
+  <button id="btn-template" title="Project Template">Template</button>
   <button id="btn-commit" title="Commit All">Commit</button>
+  <span class="sep"></span>
+  <button id="btn-export-zip" title="Download ZIP">ZIP</button>
+  <button id="btn-export-json" title="Export JSON">Export</button>
+  <button id="btn-import" title="Import JSON">Import</button>
   <span class="status" id="model-status">No model loaded</span>
 </div>
 <!-- Main Grid -->
@@ -177,13 +202,31 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       <span class="hint">Ask the AI to create an HTML file, or create one manually</span>
     </div>
   </div>
-  <!-- Tool Visualization -->
-  <div id="tool-viz">
-    <div class="panel-header">
-      <span>Tool Calls</span>
-      <span id="tool-count" style="font-size:10px;color:var(--dim)">0</span>
+  <!-- Bottom Panel: Tools / Terminal / Editor / Diff -->
+  <div id="bottom-panel">
+    <div id="bottom-tabs">
+      <div class="bottom-tab active" data-tab="tools">Tools <span id="tool-count" style="font-size:9px;color:var(--dim)">0</span></div>
+      <div class="bottom-tab" data-tab="terminal">Terminal</div>
+      <div class="bottom-tab" data-tab="editor">Editor</div>
+      <div class="bottom-tab" data-tab="diff">Diff</div>
     </div>
-    <div id="tool-log"></div>
+    <div id="view-tools" class="bottom-view active">
+      <div id="tool-log" style="flex:1;overflow-y:auto;padding:4px 0"></div>
+    </div>
+    <div id="view-terminal" class="bottom-view">
+      <div id="terminal-container" style="flex:1;overflow:hidden"></div>
+    </div>
+    <div id="view-editor" class="bottom-view">
+      <div id="editor-header" style="padding:4px 10px;font-size:10px;color:var(--dim);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span id="editor-filename">No file selected</span>
+        <button id="btn-editor-save" style="margin-left:auto;background:#222238;color:var(--text);border:1px solid var(--border);padding:2px 8px;border-radius:3px;cursor:pointer;font-size:10px;font-family:inherit">Save</button>
+      </div>
+      <div id="editor-container" style="flex:1;overflow:hidden"></div>
+    </div>
+    <div id="view-diff" class="bottom-view">
+      <div id="diff-header" style="padding:4px 10px;font-size:10px;color:var(--dim);border-bottom:1px solid var(--border);flex-shrink:0">Select a commit to view diff</div>
+      <div id="diff-container" style="flex:1;overflow:auto;padding:4px"></div>
+    </div>
   </div>
   <!-- Chat Panel -->
   <div id="chat-panel">
@@ -216,11 +259,20 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     </div>
   </div>
 </div>
+<!-- Template Modal -->
+<div id="template-modal"><div id="template-list"></div></div>
+<!-- Hidden file input for import -->
+<input type="file" id="import-input" accept=".json,.sandbox.json" style="display:none">
 <script type="module">
 import { createFile, editFile, readFile, deleteFile, listFiles, searchFiles,
          commitChanges, getLog, getDiff, checkout, initRepo, getPreviewHTML,
          getPreviewableFiles, executeTool, parseToolCalls, buildToolSystemPrompt,
          getRepoState, getAllFiles, patchFile } from './modules/mcp-tools-engine.js';
+import { createEditor } from './modules/code-editor.js';
+import { computeDiff, mountDiffViewer } from './modules/diff-viewer.js';
+import { getTemplateList, generateTemplate } from './modules/file-templates.js';
+import { exportAsJSON, importFromJSON, exportAsZIP, downloadBlob, setupDragDrop } from './modules/export-import.js';
+import { createTerminal } from './modules/terminal.js';
 // ─── State ───
 let engine = null;
 let webllm = null;
@@ -232,6 +284,9 @@ let selectedFile = null;
 let toolCallCount = 0;
 let micActive = false;
 let recognition = null;
+let currentEditor = null;
+let terminal = null;
+let activeBottomTab = 'tools';
 // Voice analysis state
 let audioCtx = null, analyser = null, micStream = null, dataArray = null, freqArray = null;
 const voice = { rms: 0, f0: 0, pDelta: 0, sustain: 0, coherence: 0, vowel: '', pulseRate: 0, energy: 0 };
@@ -257,6 +312,11 @@ const $iframeBox   = document.getElementById('iframe-container');
 const $noPreview   = document.getElementById('no-preview');
 const $toolLog     = document.getElementById('tool-log');
 const $toolCount   = document.getElementById('tool-count');
+const $bottomTabs  = document.querySelectorAll('.bottom-tab');
+const $editorBox   = document.getElementById('editor-container');
+const $editorFile  = document.getElementById('editor-filename');
+const $diffBox     = document.getElementById('diff-container');
+const $diffHeader  = document.getElementById('diff-header');
 const $chatMsgs    = document.getElementById('chat-messages');
 const $chatInput   = document.getElementById('chat-input');
 const $voiceStatus = document.getElementById('voice-status');
@@ -320,6 +380,11 @@ async function startSandbox() {
   $repoName.textContent = 'my-project';
   refreshFileList();
   refreshCommitLog();
+  initTerminal();
+  initBottomTabs();
+  initTemplateModal();
+  initExportImport();
+  initDragDrop();
   addSystemMsg('Sandbox initialized. ' + (modelLoaded
     ? 'AI model loaded — talk or type to start building!'
     : 'No AI model — you can still create files manually.'));
@@ -331,6 +396,167 @@ async function startSandbox() {
     try { recognition.start(); } catch(e) {}
     $voiceStatus.textContent = 'Listening — speak to chat...';
   }
+}
+// ─── Bottom Panel Tabs ───
+function initBottomTabs() {
+  $bottomTabs.forEach(tab => {
+    tab.onclick = () => switchBottomTab(tab.dataset.tab);
+  });
+}
+function switchBottomTab(tabId) {
+  activeBottomTab = tabId;
+  $bottomTabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tabId));
+  document.querySelectorAll('.bottom-view').forEach(v => v.classList.remove('active'));
+  const view = document.getElementById('view-' + tabId);
+  if (view) view.classList.add('active');
+}
+// ─── Terminal ───
+function initTerminal() {
+  terminal = createTerminal(document.getElementById('terminal-container'), {
+    getFiles: () => getAllFiles(),
+    getRepoState: () => getRepoState()
+  });
+}
+// ─── Code Editor ───
+function openFileInEditor(path) {
+  const file = readFile(path);
+  if (!file.ok) return;
+  selectedFile = path;
+  $editorFile.textContent = path;
+  if (currentEditor) currentEditor.destroy();
+  currentEditor = createEditor($editorBox, {
+    content: file.content,
+    fileType: file.type,
+    onChange: () => {}
+  });
+  switchBottomTab('editor');
+}
+document.getElementById('btn-editor-save').onclick = () => {
+  if (!currentEditor || !selectedFile) return;
+  const content = currentEditor.getValue();
+  editFile(selectedFile, content);
+  refreshFileList();
+  if (selectedFile.endsWith('.html') || selectedFile.endsWith('.htm')) {
+    showPreview(selectedFile);
+  }
+  addSystemMsg(`Saved ${selectedFile}`);
+};
+// ─── Diff Viewer ───
+function showCommitDiff(commitIndex) {
+  const { commits } = getLog(100);
+  if (commitIndex < 0 || commitIndex >= commits.length - 1) {
+    $diffHeader.textContent = 'No previous commit to diff against';
+    $diffBox.innerHTML = '';
+    return;
+  }
+  const log = getLog(100);
+  const allCommits = log.commits;
+  // commits are in reverse order; get current and previous
+  const current = allCommits[commitIndex];
+  const previous = allCommits[commitIndex + 1];
+  if (!current || !previous) return;
+  $diffHeader.textContent = `Diff: ${previous.id} → ${current.id} — "${current.message}"`;
+  // Get files at each commit by checking out temporarily — for now show staged diff
+  const diffResult = getDiff();
+  let html = '';
+  if (diffResult.changes.length === 0) {
+    html = '<div style="padding:12px;color:#556;text-align:center">No uncommitted changes</div>';
+  } else {
+    for (const change of diffResult.changes) {
+      const color = change.status === 'added' ? '#98c379' : change.status === 'deleted' ? '#e06c75' : '#d19a66';
+      html += `<div style="padding:4px 8px;color:${color};font-size:11px">${change.status}: ${change.path}</div>`;
+    }
+  }
+  $diffBox.innerHTML = html;
+  switchBottomTab('diff');
+}
+// ─── Template Modal ───
+function initTemplateModal() {
+  const modal = document.getElementById('template-modal');
+  const list = document.getElementById('template-list');
+  document.getElementById('btn-template').onclick = () => {
+    const templates = getTemplateList();
+    list.innerHTML = '<h3>PROJECT TEMPLATES</h3>';
+    for (const tpl of templates) {
+      const item = document.createElement('div');
+      item.className = 'tpl-item';
+      item.innerHTML = `<div class="tpl-name">${tpl.name}</div><div class="tpl-desc">${tpl.desc}</div>`;
+      item.onclick = () => {
+        const name = $repoName.textContent || 'my-project';
+        const result = generateTemplate(tpl.id, { projectName: name });
+        if (result.error) { addSystemMsg('Template error: ' + result.description); return; }
+        for (const [path, content] of Object.entries(result.files)) {
+          const existing = readFile(path);
+          if (existing.ok) editFile(path, content);
+          else createFile(path, content);
+        }
+        commitChanges(`Scaffold: ${tpl.name}`);
+        refreshFileList();
+        refreshCommitLog();
+        // Auto-preview if has HTML
+        const htmlFiles = Object.keys(result.files).filter(p => p.endsWith('.html'));
+        if (htmlFiles.length > 0) showPreview(htmlFiles[0]);
+        modal.classList.remove('open');
+        addSystemMsg(`Template "${tpl.name}" applied — ${Object.keys(result.files).length} files created`);
+      };
+      list.appendChild(item);
+    }
+    // Close button
+    const closeBtn = document.createElement('div');
+    closeBtn.style.cssText = 'text-align:center;margin-top:12px;color:var(--dim);cursor:pointer;font-size:11px';
+    closeBtn.textContent = '[ close ]';
+    closeBtn.onclick = () => modal.classList.remove('open');
+    list.appendChild(closeBtn);
+    modal.classList.add('open');
+  };
+  modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('open'); };
+}
+// ─── Export / Import ───
+function initExportImport() {
+  document.getElementById('btn-export-zip').onclick = () => {
+    const files = getAllFiles();
+    const { blob, filename } = exportAsZIP(files, $repoName.textContent);
+    downloadBlob(blob, filename);
+    addSystemMsg(`Exported ${filename}`);
+  };
+  document.getElementById('btn-export-json').onclick = () => {
+    const files = getAllFiles();
+    const { blob, filename } = exportAsJSON(files, $repoName.textContent);
+    downloadBlob(blob, filename);
+    addSystemMsg(`Exported ${filename}`);
+  };
+  const importInput = document.getElementById('import-input');
+  document.getElementById('btn-import').onclick = () => importInput.click();
+  importInput.onchange = async () => {
+    const file = importInput.files[0];
+    if (!file) return;
+    const text = await file.text();
+    const result = importFromJSON(text);
+    if (result.error) { addSystemMsg('Import error: ' + result.error); return; }
+    if (result.name) { initRepo(result.name); $repoName.textContent = result.name; }
+    for (const [path, f] of Object.entries(result.files)) {
+      createFile(path, f.content || '');
+    }
+    commitChanges('Imported project');
+    refreshFileList();
+    refreshCommitLog();
+    addSystemMsg(`Imported "${result.name}" — ${Object.keys(result.files).length} files`);
+    importInput.value = '';
+  };
+}
+// ─── Drag & Drop ───
+function initDragDrop() {
+  const filePanel = document.getElementById('file-panel');
+  setupDragDrop(filePanel, ({ files }) => {
+    for (const f of files) {
+      const path = '/' + f.name;
+      const existing = readFile(path);
+      if (existing.ok) editFile(path, f.content);
+      else createFile(path, f.content);
+    }
+    refreshFileList();
+    addSystemMsg(`Dropped ${files.length} file(s)`);
+  });
 }
 // ─── File Explorer ───
 function refreshFileList() {
@@ -356,8 +582,9 @@ function selectFile(path) {
   selectedFile = path;
   refreshFileList();
   const file = readFile(path);
-  if (file.ok && file.type === 'html') {
-    showPreview(path);
+  if (file.ok) {
+    openFileInEditor(path);
+    if (file.type === 'html') showPreview(path);
   }
 }
 function formatSize(b) {
@@ -397,12 +624,14 @@ document.getElementById('btn-refresh-preview').onclick = () => {
 function refreshCommitLog() {
   const { commits } = getLog(10);
   $commitLog.innerHTML = '';
-  for (const c of commits) {
+  commits.forEach((c, idx) => {
     const div = document.createElement('div');
     div.className = 'commit-entry';
+    div.style.cursor = 'pointer';
     div.innerHTML = `<span class="cid">${c.id}</span> <span class="cmsg">${escHtml(c.message)}</span>`;
+    div.onclick = () => showCommitDiff(idx);
     $commitLog.appendChild(div);
-  }
+  });
   const state = getRepoState();
   $branchDisp.textContent = state.branch;
 }
